@@ -90,6 +90,6 @@ Traceback (most recent call last):
 I found a lengthy thread on this subject:
 - [[weewx-development] weewx v4 need for syslog daemon](https://www.mail-archive.com/weewx-development@googlegroups.com/msg02573.html)
 
-And the author of the thread posted a work-around on his repository: [vinceskahan/weewx-docker}(https://github.com/vinceskahan/weewx-docker)
+And the author of the thread posted a work-around on his repository: [vinceskahan/weewx-docker](https://github.com/vinceskahan/weewx-docker)
 
 
