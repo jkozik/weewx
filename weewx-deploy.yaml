@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weewx
+  labels:
+    app: weewx
+spec:
+  selector:
+    matchLabels:
+      app: weewx
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: weewx
+    spec:
+      containers:
+      - image: httpd:latest
+        name: weewx-apache
+        volumeMounts:
+        - mountPath: /usr/local/apache2/htdocs
+          name: weewx-html
+        ports:
+        - containerPort: 80
+          protocol: TCP
+      - image:  mitct02/weewx:4.5.1
+        name: weewx
+        securityContext:
+          privileged: true
+        ports:
+        env:
+        - name: CONF_FILE
+          value: /home/weewx/conf/weewx.conf
+        - name: TZ
+          value: America/Chicago
+        volumeMounts:
+        - mountPath: /home/weewx/conf
+          name: weewx-conf
+        - mountPath: /home/weewx/archive
+          name: weewx-archive
+        - mountPath: /home/weewx/public_html
+          name: weewx-html
+        - mountPath: /dev/ttyUSB0
+          name: vantage-usb
+      nodeSelector:
+        weewx: hasVantageUSB
+      volumes:
+      - name: weewx-conf
+        persistentVolumeClaim:
+          claimName: weewx-conf
+      - name: weewx-archive
+        persistentVolumeClaim:
+          claimName: weewx-archive
+      - name: weewx-html
+        emptyDir: {}
+      - name: vantage-usb
+        hostPath:
+          path: /dev/ttyUSB0
