@@ -2,7 +2,9 @@
 weewx weather station software - weewx.napervilleweather.net
 
 ## Background
-I have been running weewx weather station software since 2018 in a centos7 VM under virtualbox.  It has been working perfectly.  Now it is time to port it into my kubernetes clusters.  Here's my notes.
+I have been running weewx weather station software since 2018 in a centos7 VM under virtualbox.  It has been working perfectly.  Now it is time to port it into my kubernetes clusters.  In this repository, I have a backup of the weewx.sdb file that is holding 3 years of weather telemetry data. 
+
+Here's my notes.
 
 # Deploy tomdotorg/docker-weewx's repository in my kubernetes cluster
 The [tomdotorg/docker-weewx](https://github.com/tomdotorg/docker-weewx) repository has a weewx image that can be configured to run in kubernetes.  My setup:
