@@ -4,7 +4,100 @@ weewx weather station software - weewx.napervilleweather.net
 # Background
 I have been running weewx weather station software since 2018 in a centos7 VM under virtualbox.  It has been working perfectly.  Now it is time to port it into my kubernetes clusters.  Here's my notes.
 
-# Do it yourself
+# Deploy tomdotorg/docker-weewx's repository in my kubernetes cluster
+The [tomdotorg/docker-weewx](https://github.com/tomdotorg/docker-weewx) repository has a weewx image that can be configured to run in kubernetes.  My setup:
+- [Davis Vantage Pro2 weather station](https://www.davisinstruments.com/pages/vantage-pro2)
+- Davis [Wireless Weather Envoy](https://www.davisinstruments.com/products/wireless-weather-envoy?pr_prod_strat=description&pr_rec_pid=6661299241121&pr_ref_pid=6661301665953&pr_seq=uniform) USB data logger
+- Kubernetes cluster spread across two dell servers. 
+
+The Weather station transmits weather telemetry to the Envoy.  The Envoy receives it and relays the data over a USB connection.  My kubernetes node called kworker1 has a USB port defined, called /dev/ttyUSB0.  Only kworker1 can see this port.
+
+The weewx application requires a configuration file, weewx.conf.  I customize that file to fit my setup.  The weewx application archives all of the weather data in a SQLite database, weewx.sdb. I choose to put these files on external PersistantVolumes.  I want these files to persist even if the weewx appliation gets trashed, reset or upgraded.  
+
+## Setup weewx user and directory 
+I want to make to Persistent Volumes using NFS.  To help self document this, I am setting up a weewx user, setting up a simple directory structure and sharing two of the directories in NFS.
+```
+[root@dell2 ~]# tree ~weewx
+/home/weewx
+|
+└── nfs
+    ├── archive
+    │   |
+    │   └── weewx.sdb
+    └── conf
+        └── weewx.conf
+        
+[root@dell2 ~]# cat /etc/exports # add the following two lines to nfs exports file
+[...]
+/home/weewx/nfs/conf 192.168.100.0/24(rw,sync,no_root_squash,no_all_squash,no_subtree_check,insecure)
+/home/weewx/nfs/archive 192.168.100.0/24(rw,sync,no_root_squash,no_all_squash,no_subtree_check,insecure)
+
+[root@dell2 ~]# service nfs-server restart
+Redirecting to /bin/systemctl restart nfs-server.service
+[root@dell2 ~]#
+```
+
+These are both made into PVs and PVCs.
+```
+[jkozik@dell2 weewx]$ kubectl apply -f weewx-conf-archive-pv.yaml
+persistentvolume/weewx-conf created
+persistentvolume/weewx-archive created
+[jkozik@dell2 weewx]$ kubectl apply -f weewx-conf-archive-pvc.yaml
+persistentvolumeclaim/weewx-conf created
+persistentvolumeclaim/weewx-archive created
+[jkozik@dell2 weewx]$ kubectl get pv,pvc
+NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                  STORAGECLASS   REASON   AGE
+persistentvolume/weewx-archive                              1Gi        RWO            Retain           Bound    default/weewx-archive                  nfs                     142m
+persistentvolume/weewx-conf                                 1Gi        RWO            Retain           Bound    default/weewx-conf                     nfs                     142m
+
+
+NAME                                                 STATUS    VOLUME                         CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/weewx-archive                  Bound     weewx-archive                  1Gi        RWO            nfs            142m
+persistentvolumeclaim/weewx-conf                     Bound     weewx-conf                     1Gi        RWO            nfs            142m
+```
+The weewx server scans the stream from the USB data logger.  It saves the data into the weewx.sdb and every 10 minutes or so generates a set of images and html files. This runs in a container with volume mounts pointing the the configuration files and stores the weewx.sdb in an archive volume. Note also, this container gets access to the /dev/ttyUSB0 serial port. 
+
+Also in this POD there is an apache web server that renders tht images and htmls files generates by the weewx server.  Please look at the weewx-deployment.yaml file for details.  
+```
+[jkozik@dell2 weewx]$ kubectl apply -f weewx-deploy.yaml
+deployment.apps/weewx created
+
+[jkozik@dell2 weewx]$ kubectl get pods
+NAME                                               READY   STATUS      RESTARTS   AGE
+weewx-85ddcf7954-5jd9v                             2/2     Running     0          72m
+
+[jkozik@dell2 weewx]$ kubectl exec -it weewx-85ddcf7954-5jd9v  -c weewx -- /bin/bash
+root@weewx-85ddcf7954-5jd9v:/# cd /home/weewx
+root@weewx-85ddcf7954-5jd9v:~# ls
+archive  bin  conf  docs  examples  LICENSE.txt  public_html  README.md  skins  tmp  util  weewx.conf  weewx.conf.4.5.1
+root@weewx-85ddcf7954-5jd9v:/# cd /home/weewx/public_html
+root@weewx-85ddcf7954-5jd9v:~/public_html# ls
+celestial.html    daytempfeel.png  favicon.ico         monthrx.png        monthwind.png     telemetry.html     weektempfeel.png  yearbarometer.png  yeartempin.png
+daybarometer.png  daytempin.png    font                monthtempdew.png   monthwindvec.png  weekbarometer.png  weektempin.png    yearhumin.png      yeartemp.png
+dayhumin.png      daytemp.png      index.html          monthtempfeel.png  NOAA              weekhumin.png      weektemp.png      yearhum.png        yearuv.png
+dayhum.png        dayuv.png        monthbarometer.png  monthtempin.png    rss.xml           weekhum.png        weekuv.png        yearradiation.png  yearvolt.png
+dayradiation.png  dayvolt.png      monthhumin.png      monthtemp.png      seasons.css       weekradiation.png  weekvolt.png      yearrain.png       yearwinddir.png
+dayrain.png       daywinddir.png   monthhum.png        monthuv.png        seasons.js        weekrain.png       weekwinddir.png   yearrx.png         yearwind.png
+dayrx.png         daywind.png      monthradiation.png  monthvolt.png      statistics.html   weekrx.png         weekwind.png      yeartempdew.png    yearwindvec.png
+daytempdew.png    daywindvec.png   monthrain.png       monthwinddir.png   tabular.html      weektempdew.png    weekwindvec.png   yeartempfeel.png
+root@weewx-85ddcf7954-5jd9v:~/public_html#
+root@weewx-85ddcf7954-5jd9v:~# cd archive
+root@weewx-85ddcf7954-5jd9v:~/archive# ls
+bckweewx.sdb092021  weewx.sdb
+root@weewx-85ddcf7954-5jd9v:~/archive# exit
+exit
+```
+Note: from above, the weewx pod has two containers.  Exec into the weewx container and verify that the public_html directory gets populated.  It takes a few minutes to generate. 
+
+## Apply Service and Ingress
+And finally, a service needs to be configured to expose the web port from the apache httpd.  Then an ingress needs to be applyed to map this service to the URL http://weewx.napervilleweather.net.  
+```
+[jkozik@dell2 weewx]$ kubectl apply -f weewx-svc.yaml -f weewx-ingress-tls.yaml
+service/weewx unchanged
+ingress.networking.k8s.io/weewx-ingress configured
+```
+
+# Here's notes from when I tried to "Do it yourself"
 I was able to install weewx in a Centos7 container using the following:
 ```
 [jkozik@weewx weewx]$ pwd
