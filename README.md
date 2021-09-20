@@ -1,7 +1,7 @@
-# weewx
+# Configure weewx weather software for my Davis Vantage Pro2
 weewx weather station software - weewx.napervilleweather.net
 
-# Background
+## Background
 I have been running weewx weather station software since 2018 in a centos7 VM under virtualbox.  It has been working perfectly.  Now it is time to port it into my kubernetes clusters.  Here's my notes.
 
 # Deploy tomdotorg/docker-weewx's repository in my kubernetes cluster
@@ -10,7 +10,7 @@ The [tomdotorg/docker-weewx](https://github.com/tomdotorg/docker-weewx) reposito
 - Davis [Wireless Weather Envoy](https://www.davisinstruments.com/products/wireless-weather-envoy?pr_prod_strat=description&pr_rec_pid=6661299241121&pr_ref_pid=6661301665953&pr_seq=uniform) USB data logger
 - Kubernetes cluster spread across two dell servers. 
 
-The Weather station transmits weather telemetry to the Envoy.  The Envoy receives it and relays the data over a USB connection.  My kubernetes node called kworker1 has a USB port defined, called /dev/ttyUSB0.  Only kworker1 can see this port.
+The Weather station transmits weather telemetry to the Envoy.  The Envoy receives it and relays the data over a USB connection.  My kubernetes node called kworker1 has a USB port defined, called /dev/ttyUSB0.  Only node kworker1 can see this port. The deployment file as a node selector setup to enforce this. 
 
 The weewx application requires a configuration file, weewx.conf.  I customize that file to fit my setup.  The weewx application archives all of the weather data in a SQLite database, weewx.sdb. I choose to put these files on external PersistantVolumes.  I want these files to persist even if the weewx appliation gets trashed, reset or upgraded.  
 
@@ -50,14 +50,13 @@ NAME                                                        CAPACITY   ACCESS MO
 persistentvolume/weewx-archive                              1Gi        RWO            Retain           Bound    default/weewx-archive                  nfs                     142m
 persistentvolume/weewx-conf                                 1Gi        RWO            Retain           Bound    default/weewx-conf                     nfs                     142m
 
-
 NAME                                                 STATUS    VOLUME                         CAPACITY   ACCESS MODES   STORAGECLASS   AGE
 persistentvolumeclaim/weewx-archive                  Bound     weewx-archive                  1Gi        RWO            nfs            142m
 persistentvolumeclaim/weewx-conf                     Bound     weewx-conf                     1Gi        RWO            nfs            142m
 ```
-The weewx server scans the stream from the USB data logger.  It saves the data into the weewx.sdb and every 10 minutes or so generates a set of images and html files. This runs in a container with volume mounts pointing the the configuration files and stores the weewx.sdb in an archive volume. Note also, this container gets access to the /dev/ttyUSB0 serial port. 
+The weewx server scans the stream from the USB data logger.  It saves the data into the weewx.sdb and every 10 minutes or so generates a set of images and html files. This runs in a container with volume mounts pointing the the configuration files and stores the weewx.sdb in an archive volume. Note also, this container gets access to the /dev/ttyUSB0 serial port. I have no source code for this; I am just using the image [mitct02/weewx](https://hub.docker.com/r/mitct02/weewx) image. 
 
-Also in this POD there is an apache web server that renders tht images and htmls files generates by the weewx server.  Please look at the weewx-deployment.yaml file for details.  
+Also in this POD there is an apache web server that renders the images and htmls files generates by the weewx server. Again, I have no source for this, I am just pulling in the apache [httpd](https://hub.docker.com/_/httpd) image.  Please look at the weewx-deployment.yaml file for details.  
 ```
 [jkozik@dell2 weewx]$ kubectl apply -f weewx-deploy.yaml
 deployment.apps/weewx created
