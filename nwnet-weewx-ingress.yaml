@@ -18,24 +18,21 @@ spec:
   - host: napervilleweather.net
     http:
       paths:
-      - path: /nwnet/(.*)
-      #- path: /nwnet(/|$)(.*)
+      - path: /nwnet/(.*)   # napervilleweather.net/nwnet
         pathType: Prefix
         backend:
           service:
             name: nwnet
             port:
               number: 80
-     # - path: /weewx(/|$)(.*)
-      #- path: /weewx(/|$)(.*)
-      - path: /weewx/(.*)
+      - path: /weewx/(.*)   # napervilleweather.net/weewx
         pathType: Prefix
         backend:
           service:
             name: weewx
             port:
               number: 80
-      - path: /(.*)
+      - path: /(.*)         # napervilleweather.net
         pathType: Prefix
         backend:
           service:
