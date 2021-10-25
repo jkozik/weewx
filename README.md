@@ -96,6 +96,13 @@ And finally, a service needs to be configured to expose the web port from the ap
 [jkozik@dell2 weewx]$ kubectl apply -f weewx-svc.yaml -f weewx-ingress-tls.yaml
 service/weewx unchanged
 ingress.networking.k8s.io/weewx-ingress configured
+
+## Update: weewx.napervilleweather.net -> napervilleweather.net/weewx
+Because of difficulties with the cert manager, I am not able to support https://weewx.napervilleweather.net.  It goes to challenges setting up a *.example.com wildcard domain in Let's Encrypt.  I am sure it can be done, but I gave up.
+
+To make the path based ingress work, I editted, the ingress file found in the original napervilleweather.net deployment and created a new one: [nwnet-weewx-ingress.yaml](https://github.com/jkozik/weewx/blob/main/nwnet-weewx-ingress.yaml).
+
+Note: this one ingress file supports two web servers running under the napervilleweather.net domain: 1-[napervilleweather.net](https://napervilleweather.net) and 2-[napervilleweather.net/weewx](https://napervilleweather.net/weewx).  For the future, if changes are made to the repository [k8sNw.net](https://github.com/jkozik/k8sNw.net) they need to be corrdinated with the [weewx](https://github.com/jkozik/weewx) repository.  
 ```
 
 # Here's notes from when I tried to "Do it yourself"
