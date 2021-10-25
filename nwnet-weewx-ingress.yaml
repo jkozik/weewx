@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nwnet-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      rewrite ^(/weewx)$ $1/ redirect;
+      rewrite ^(/nwnet)$ $1/ redirect;
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - napervilleweather.net
+    secretName: napervilleweather-net-tls
+  rules:
+  - host: napervilleweather.net
+    http:
+      paths:
+      - path: /nwnet/(.*)
+      #- path: /nwnet(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: nwnet
+            port:
+              number: 80
+     # - path: /weewx(/|$)(.*)
+      #- path: /weewx(/|$)(.*)
+      - path: /weewx/(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: weewx
+            port:
+              number: 80
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: nwnet
+            port:
+              number: 80
+
